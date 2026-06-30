@@ -5,7 +5,6 @@ import streamlit.components.v1 as components
 from datetime import date, timedelta
 import requests
 import json
-import tempfile
 import os
 
 # =========================================================================
@@ -20,28 +19,26 @@ def initialize_ee():
         client_email = st.secrets["ee_client_email"]
         project_id = st.secrets["ee_project_id"]
         
-        # Ensure we are getting the raw string from the secret and cleaning it
+        # Access the private key string
         raw_key = st.secrets["ee_private_key"]
-        # Handle cases where the secret might be stored as a JSON string or raw block
-        if raw_key.startswith('"') and raw_key.endswith('"'):
-            raw_key = json.loads(raw_key)
         
-        private_key = raw_key.replace('\\n', '\n')
+        # Ensure the key is properly formatted as a string with newlines
+        # We strip potential surrounding quotes and replace escaped newlines
+        private_key = raw_key.strip('"').replace('\\n', '\n')
         
-        # Write the key to a temporary file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_key_file:
-            tmp_key_file.write(private_key)
-            tmp_key_path = tmp_key_file.name
+        # Use a service account dict approach which is more reliable for Cloud
+        service_account_info = {
+            "client_email": client_email,
+            "private_key": private_key,
+            "project_id": project_id
+        }
         
-        # Initialize
+        # Authenticate using the dictionary-based service account info
         credentials = ee.ServiceAccountCredentials(
             client_email,
-            key_file=tmp_key_path
+            key_data=private_key
         )
         ee.Initialize(credentials, project=project_id)
-        
-        # Cleanup
-        os.remove(tmp_key_path)
         
     except Exception as e:
         st.error(f"Authentication failed: {e}")

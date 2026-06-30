@@ -20,29 +20,29 @@ def initialize_ee():
         client_email = st.secrets["ee_client_email"]
         project_id = st.secrets["ee_project_id"]
         
-        # Access the private key string and ensure it is cleaned
+        # Access the private key string
         raw_key = st.secrets["ee_private_key"]
         
-        # This normalization ensures that any escaped newlines become actual newline characters
-        # required for valid PEM format.
+        # Normalize: handle escaped newlines or JSON-encoded strings
+        # We ensure we have a clean string representation of the PEM block
+        if raw_key.startswith('"') and raw_key.endswith('"'):
+            raw_key = json.loads(raw_key)
         private_key = raw_key.replace('\\n', '\n')
         
-        # Create a temporary file to store the private key.
-        # The underlying cryptography library often fails when passed the string directly
-        # due to character encoding or internal path checks.
-        tmp = tempfile.NamedTemporaryFile(mode='w', delete=False)
-        tmp.write(private_key)
-        tmp.close()
+        # Write the key to a temporary file using binary mode to avoid encoding issues
+        with tempfile.NamedTemporaryFile(mode='wb', delete=False) as tmp_key_file:
+            tmp_key_file.write(private_key.encode('utf-8'))
+            tmp_key_path = tmp_key_file.name
         
         # Authenticate using the path to the temp file
         credentials = ee.ServiceAccountCredentials(
             client_email,
-            key_file=tmp.name
+            key_file=tmp_key_path
         )
         ee.Initialize(credentials, project=project_id)
         
-        # Remove the temp file after initialization
-        os.remove(tmp.name)
+        # Cleanup temp file path after initialization
+        os.remove(tmp_key_path)
         
     except Exception as e:
         st.error(f"Authentication failed: {e}")

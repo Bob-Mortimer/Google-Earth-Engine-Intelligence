@@ -19,13 +19,20 @@ def initialize_ee():
         client_email = st.secrets["ee_client_email"]
         project_id = st.secrets["ee_project_id"]
         
-        # Access the private key string
+        # Access the private key string and ensure it is cleaned
         raw_key = st.secrets["ee_private_key"]
         
-        # Normalize: handle escaped newlines
-        private_key = raw_key.replace('\\n', '\n')
-        if private_key.startswith('"') and private_key.endswith('"'):
-            private_key = json.loads(private_key)
+        # Rigorously format the private key string
+        # 1. Remove outer quotes if present
+        # 2. Ensure standard PEM header and footer exist if missing
+        # 3. Ensure newlines are actual \n characters
+        private_key = raw_key.strip('"').strip("'")
+        private_key = private_key.replace('\\n', '\n')
+        
+        if not private_key.startswith("-----BEGIN PRIVATE KEY-----"):
+            private_key = "-----BEGIN PRIVATE KEY-----\n" + private_key
+        if not private_key.endswith("-----END PRIVATE KEY-----"):
+            private_key = private_key + "\n-----END PRIVATE KEY-----"
             
         # Construct the service account dictionary
         service_account_info = {

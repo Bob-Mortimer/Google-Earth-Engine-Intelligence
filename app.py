@@ -18,21 +18,21 @@ def initialize_ee():
         # Retrieve secrets
         client_email = st.secrets["ee_client_email"]
         project_id = st.secrets["ee_project_id"]
-        
-        # Access the private key secret
-        # Streamlit secrets often store \n as a literal string. We must force-convert.
         raw_key = st.secrets["ee_private_key"]
         
-        # Rigorous cleanup: Ensure \n characters are actual newlines and remove wrappers
-        private_key = raw_key.replace('\\n', '\n')
-        private_key = private_key.replace('"', '').replace("'", "").strip()
-        
-        # Ensure correct PEM boundaries
-        if not private_key.startswith("-----BEGIN PRIVATE KEY-----"):
-            private_key = "-----BEGIN PRIVATE KEY-----\n" + private_key
-        if not private_key.endswith("-----END PRIVATE KEY-----"):
-            private_key = private_key + "\n-----END PRIVATE KEY-----"
-            
+        # We try to interpret the raw_key as a JSON-escaped string
+        # which often happens when secrets are stored as strings in configuration
+        try:
+            # If the user stored the full JSON block in the secret, load it
+            if raw_key.strip().startswith('{'):
+                key_dict = json.loads(raw_key)
+                private_key = key_dict['private_key']
+            else:
+                # If it's just the key string, clean the literal \n characters
+                private_key = raw_key.replace('\\n', '\n').strip('"').strip("'")
+        except:
+            private_key = raw_key.replace('\\n', '\n').strip('"').strip("'")
+
         # Construct the service account dictionary
         service_account_info = {
             "type": "service_account",
@@ -47,14 +47,14 @@ def initialize_ee():
             "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email.replace('@', '%40')}"
         }
         
-        # Authenticate
+        # Use the dictionary-based constructor which handles the byte parsing internally
         credentials = service_account.Credentials.from_service_account_info(service_account_info)
         scoped_credentials = credentials.with_scopes(['https://www.googleapis.com/auth/earthengine'])
         
         ee.Initialize(credentials=scoped_credentials, project=project_id)
         
     except Exception as e:
-        st.error(f"Authentication failed: {e}. Ensure the private key secret contains actual line breaks.")
+        st.error(f"Authentication failed: {e}")
         st.stop()
 
 initialize_ee()

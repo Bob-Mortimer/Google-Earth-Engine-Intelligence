@@ -20,22 +20,14 @@ def initialize_ee():
         project_id = st.secrets["ee_project_id"]
         
         # Access the private key secret
+        # Streamlit secrets often store \n as a literal string. We must force-convert.
         raw_key = st.secrets["ee_private_key"]
         
-        # STRATEGY: Attempt to interpret the secret as a JSON block first (standard for GCP)
-        # If the secret is just the key string, we fallback to manual cleaning.
-        try:
-            # If the secret was pasted as a full JSON file content
-            key_data = json.loads(raw_key)
-            if isinstance(key_data, dict):
-                private_key = key_data["private_key"]
-            else:
-                private_key = raw_key
-        except (json.JSONDecodeError, KeyError):
-            # Fallback: Treat as a raw string
-            private_key = raw_key.replace('\\n', '\n').strip('"').strip("'")
+        # Rigorous cleanup: Ensure \n characters are actual newlines and remove wrappers
+        private_key = raw_key.replace('\\n', '\n')
+        private_key = private_key.replace('"', '').replace("'", "").strip()
         
-        # Final rigorous check to ensure it is a valid PEM block
+        # Ensure correct PEM boundaries
         if not private_key.startswith("-----BEGIN PRIVATE KEY-----"):
             private_key = "-----BEGIN PRIVATE KEY-----\n" + private_key
         if not private_key.endswith("-----END PRIVATE KEY-----"):
@@ -62,7 +54,7 @@ def initialize_ee():
         ee.Initialize(credentials=scoped_credentials, project=project_id)
         
     except Exception as e:
-        st.error(f"Authentication failed: {e}. Please ensure your secret contains the raw key block.")
+        st.error(f"Authentication failed: {e}. Ensure the private key secret contains actual line breaks.")
         st.stop()
 
 initialize_ee()

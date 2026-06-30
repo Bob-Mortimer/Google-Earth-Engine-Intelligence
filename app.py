@@ -4,6 +4,7 @@ import folium
 import streamlit.components.v1 as components
 from datetime import date, timedelta
 import requests
+import json
 
 # =========================================================================
 # 1. PAGE CONFIGURATION & INITIALIZATION
@@ -16,13 +17,14 @@ def initialize_ee():
         # Retrieve secrets
         client_email = st.secrets["ee_client_email"]
         project_id = st.secrets["ee_project_id"]
-        # The .replace('\\n', '\n') ensures that if the secret was saved with literal 
-        # '\n' characters, they are correctly converted to actual newline characters.
+        
+        # Ensure newlines are correct
         private_key = st.secrets["ee_private_key"].replace('\\n', '\n')
         
+        # Use a dictionary to create credentials directly, bypassing file path checks
         credentials = ee.ServiceAccountCredentials(
-            client_email, 
-            private_key
+            client_email,
+            key_data=private_key
         )
         ee.Initialize(credentials, project=project_id)
     except Exception as e:

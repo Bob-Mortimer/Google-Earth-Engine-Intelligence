@@ -54,7 +54,21 @@ def initialize_ee():
 # =========================================================================
 # 3. CORE LOGIC
 # =========================================================================
-def mask_s2_clouds(image):
+import requests
+
+def get_coordinates_opencage(query):
+    api_key = "st.secrets["opencage_api_key"]
+    url = f"https://api.opencagedata.com/geocode/v1/json?q={query}&key={api_key}&limit=1"
+    try:
+        response = requests.get(url).json()
+        if response['results']:
+            lat = response['results'][0]['geometry']['lat']
+            lon = response['results'][0]['geometry']['lng']
+            return lat, lon
+    except Exception as e:
+        print(f"Geocoding error: {e}")
+    return None, None
+    def mask_s2_clouds(image):
     qa = image.select('QA60')
     cloud_bit_mask = 1 << 10
     cirrus_bit_mask = 1 << 11

@@ -38,21 +38,17 @@ st.markdown("""
 st.title("🛰️ Geospatial Intelligence Dashboard")
 st.markdown("Monitor urban expansion and maritime changes using Sentinel-2 (Optical) and Sentinel-1 (SAR) satellite data.")
 
-# =========================================================================
-# 2. EARTH ENGINE INITIALIZATION
-# =========================================================================
 @st.cache_resource
 def initialize_ee():
+    # 1. Access the secrets directly
     try:
-        # 1. Attempt to use Service Account Secrets (Standard for Streamlit Cloud)
         credentials = ee.ServiceAccountCredentials(
             st.secrets["ee_client_email"], 
             st.secrets["ee_private_key"]
         )
         ee.Initialize(credentials, project=st.secrets["ee_project_id"])
     except Exception as e:
-        # 2. If secrets are missing, provide a clear error message
-        st.error("Earth Engine authentication failed. Please ensure 'ee_client_email', 'ee_private_key', and 'ee_project_id' are set in your Streamlit Cloud Secrets.")
+        st.error(f"Authentication failed: {e}")
         st.stop()
 
 # =========================================================================

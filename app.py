@@ -20,22 +20,27 @@ def initialize_ee():
         client_email = st.secrets["ee_client_email"]
         project_id = st.secrets["ee_project_id"]
         
-        # Ensure newlines are correctly interpreted
-        private_key = st.secrets["ee_private_key"].replace('\\n', '\n')
+        # Ensure we are getting the raw string from the secret and cleaning it
+        raw_key = st.secrets["ee_private_key"]
+        # Handle cases where the secret might be stored as a JSON string or raw block
+        if raw_key.startswith('"') and raw_key.endswith('"'):
+            raw_key = json.loads(raw_key)
         
-        # Write the key to a temporary file to satisfy the PEM parser
+        private_key = raw_key.replace('\\n', '\n')
+        
+        # Write the key to a temporary file
         with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_key_file:
             tmp_key_file.write(private_key)
             tmp_key_path = tmp_key_file.name
         
-        # Use the file path for credentials
+        # Initialize
         credentials = ee.ServiceAccountCredentials(
             client_email,
             key_file=tmp_key_path
         )
         ee.Initialize(credentials, project=project_id)
         
-        # Cleanup temp file path after initialization
+        # Cleanup
         os.remove(tmp_key_path)
         
     except Exception as e:

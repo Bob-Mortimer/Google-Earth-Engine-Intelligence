@@ -13,11 +13,18 @@ st.set_page_config(layout="wide", page_title="Geospatial Intelligence Dashboard"
 @st.cache_resource
 def initialize_ee():
     try:
+        # Retrieve secrets
+        client_email = st.secrets["ee_client_email"]
+        project_id = st.secrets["ee_project_id"]
+        # The .replace('\\n', '\n') ensures that if the secret was saved with literal 
+        # '\n' characters, they are correctly converted to actual newline characters.
+        private_key = st.secrets["ee_private_key"].replace('\\n', '\n')
+        
         credentials = ee.ServiceAccountCredentials(
-            st.secrets["ee_client_email"], 
-            st.secrets["ee_private_key"]
+            client_email, 
+            private_key
         )
-        ee.Initialize(credentials, project=st.secrets["ee_project_id"])
+        ee.Initialize(credentials, project=project_id)
     except Exception as e:
         st.error(f"Authentication failed: {e}")
         st.stop()

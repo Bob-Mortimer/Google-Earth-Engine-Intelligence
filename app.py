@@ -5,6 +5,8 @@ import streamlit.components.v1 as components
 from datetime import date, timedelta
 import requests
 import json
+import tempfile
+import os
 
 # =========================================================================
 # 1. PAGE CONFIGURATION & INITIALIZATION
@@ -18,15 +20,24 @@ def initialize_ee():
         client_email = st.secrets["ee_client_email"]
         project_id = st.secrets["ee_project_id"]
         
-        # Ensure newlines are correct
+        # Ensure newlines are correctly interpreted
         private_key = st.secrets["ee_private_key"].replace('\\n', '\n')
         
-        # Use a dictionary to create credentials directly, bypassing file path checks
+        # Write the key to a temporary file to satisfy the PEM parser
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp_key_file:
+            tmp_key_file.write(private_key)
+            tmp_key_path = tmp_key_file.name
+        
+        # Use the file path for credentials
         credentials = ee.ServiceAccountCredentials(
             client_email,
-            key_data=private_key
+            key_file=tmp_key_path
         )
         ee.Initialize(credentials, project=project_id)
+        
+        # Cleanup temp file path after initialization
+        os.remove(tmp_key_path)
+        
     except Exception as e:
         st.error(f"Authentication failed: {e}")
         st.stop()

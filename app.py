@@ -5,8 +5,7 @@ import streamlit.components.v1 as components
 from datetime import date, timedelta
 import requests
 import json
-import os
-import tempfile
+from google.oauth2 import service_account
 
 # =========================================================================
 # 1. PAGE CONFIGURATION & INITIALIZATION
@@ -23,26 +22,30 @@ def initialize_ee():
         # Access the private key string
         raw_key = st.secrets["ee_private_key"]
         
-        # Normalize: handle escaped newlines or JSON-encoded strings
-        # We ensure we have a clean string representation of the PEM block
-        if raw_key.startswith('"') and raw_key.endswith('"'):
-            raw_key = json.loads(raw_key)
+        # Normalize: handle escaped newlines
         private_key = raw_key.replace('\\n', '\n')
+        if private_key.startswith('"') and private_key.endswith('"'):
+            private_key = json.loads(private_key)
+            
+        # Construct the service account dictionary
+        service_account_info = {
+            "type": "service_account",
+            "project_id": project_id,
+            "private_key_id": st.secrets.get("ee_private_key_id", ""),
+            "private_key": private_key,
+            "client_email": client_email,
+            "client_id": st.secrets.get("ee_client_id", ""),
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email.replace('@', '%40')}"
+        }
         
-        # Write the key to a temporary file using binary mode to avoid encoding issues
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False) as tmp_key_file:
-            tmp_key_file.write(private_key.encode('utf-8'))
-            tmp_key_path = tmp_key_file.name
+        # Authenticate using the dictionary-based approach
+        credentials = service_account.Credentials.from_service_account_info(service_account_info)
+        scoped_credentials = credentials.with_scopes(['https://www.googleapis.com/auth/earthengine'])
         
-        # Authenticate using the path to the temp file
-        credentials = ee.ServiceAccountCredentials(
-            client_email,
-            key_file=tmp_key_path
-        )
-        ee.Initialize(credentials, project=project_id)
-        
-        # Cleanup temp file path after initialization
-        os.remove(tmp_key_path)
+        ee.Initialize(credentials=scoped_credentials, project=project_id)
         
     except Exception as e:
         st.error(f"Authentication failed: {e}")

@@ -106,7 +106,8 @@ default_lat = -35.2809
 default_lon = 149.1300
 
 if location_query:
-    geolocator = Nominatim(user_agent="geo_intelligence_dashboard")
+    # Use a highly specific user agent
+    geolocator = Nominatim(user_agent="geo_intel_dashboard_project_groovy_groove", timeout=10)
     try:
         loc = geolocator.geocode(location_query)
         if loc:
@@ -114,9 +115,9 @@ if location_query:
             default_lon = loc.longitude
             st.sidebar.success(f"Found: {loc.address}")
         else:
-            st.sidebar.warning("Location not found. Please check spelling or use coordinates below.")
-    except Exception:
-        st.sidebar.error("Geocoding service unavailable.")
+            st.sidebar.warning("Location not found.")
+    except Exception as e:
+        st.sidebar.error(f"Geocoding service error: {e}")
 
 st.sidebar.subheader("2. Exact Coordinates")
 lat_val = st.sidebar.number_input("Latitude", value=float(default_lat), format="%.6f")

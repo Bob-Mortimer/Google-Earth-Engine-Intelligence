@@ -6,6 +6,7 @@ from datetime import date, timedelta
 import requests
 import json
 import os
+import tempfile
 
 # =========================================================================
 # 1. PAGE CONFIGURATION & INITIALIZATION
@@ -19,26 +20,29 @@ def initialize_ee():
         client_email = st.secrets["ee_client_email"]
         project_id = st.secrets["ee_project_id"]
         
-        # Access the private key string
+        # Access the private key string and ensure it is cleaned
         raw_key = st.secrets["ee_private_key"]
         
-        # Ensure the key is properly formatted as a string with newlines
-        # We strip potential surrounding quotes and replace escaped newlines
-        private_key = raw_key.strip('"').replace('\\n', '\n')
+        # This normalization ensures that any escaped newlines become actual newline characters
+        # required for valid PEM format.
+        private_key = raw_key.replace('\\n', '\n')
         
-        # Use a service account dict approach which is more reliable for Cloud
-        service_account_info = {
-            "client_email": client_email,
-            "private_key": private_key,
-            "project_id": project_id
-        }
+        # Create a temporary file to store the private key.
+        # The underlying cryptography library often fails when passed the string directly
+        # due to character encoding or internal path checks.
+        tmp = tempfile.NamedTemporaryFile(mode='w', delete=False)
+        tmp.write(private_key)
+        tmp.close()
         
-        # Authenticate using the dictionary-based service account info
+        # Authenticate using the path to the temp file
         credentials = ee.ServiceAccountCredentials(
             client_email,
-            key_data=private_key
+            key_file=tmp.name
         )
         ee.Initialize(credentials, project=project_id)
+        
+        # Remove the temp file after initialization
+        os.remove(tmp.name)
         
     except Exception as e:
         st.error(f"Authentication failed: {e}")

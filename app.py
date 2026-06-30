@@ -19,16 +19,23 @@ def initialize_ee():
         client_email = st.secrets["ee_client_email"]
         project_id = st.secrets["ee_project_id"]
         
-        # Access the private key string and ensure it is cleaned
+        # Access the private key secret
         raw_key = st.secrets["ee_private_key"]
         
-        # Rigorously format the private key string
-        # 1. Remove outer quotes if present
-        # 2. Ensure standard PEM header and footer exist if missing
-        # 3. Ensure newlines are actual \n characters
-        private_key = raw_key.strip('"').strip("'")
-        private_key = private_key.replace('\\n', '\n')
+        # STRATEGY: Attempt to interpret the secret as a JSON block first (standard for GCP)
+        # If the secret is just the key string, we fallback to manual cleaning.
+        try:
+            # If the secret was pasted as a full JSON file content
+            key_data = json.loads(raw_key)
+            if isinstance(key_data, dict):
+                private_key = key_data["private_key"]
+            else:
+                private_key = raw_key
+        except (json.JSONDecodeError, KeyError):
+            # Fallback: Treat as a raw string
+            private_key = raw_key.replace('\\n', '\n').strip('"').strip("'")
         
+        # Final rigorous check to ensure it is a valid PEM block
         if not private_key.startswith("-----BEGIN PRIVATE KEY-----"):
             private_key = "-----BEGIN PRIVATE KEY-----\n" + private_key
         if not private_key.endswith("-----END PRIVATE KEY-----"):
@@ -48,14 +55,14 @@ def initialize_ee():
             "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email.replace('@', '%40')}"
         }
         
-        # Authenticate using the dictionary-based approach
+        # Authenticate
         credentials = service_account.Credentials.from_service_account_info(service_account_info)
         scoped_credentials = credentials.with_scopes(['https://www.googleapis.com/auth/earthengine'])
         
         ee.Initialize(credentials=scoped_credentials, project=project_id)
         
     except Exception as e:
-        st.error(f"Authentication failed: {e}")
+        st.error(f"Authentication failed: {e}. Please ensure your secret contains the raw key block.")
         st.stop()
 
 initialize_ee()

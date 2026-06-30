@@ -44,22 +44,16 @@ st.markdown("Monitor urban expansion and maritime changes using Sentinel-2 (Opti
 @st.cache_resource
 def initialize_ee():
     try:
-        # Streamlit Cloud deployment: Use secrets provided in the Streamlit Dashboard
+        # 1. Attempt to use Service Account Secrets (Standard for Streamlit Cloud)
         credentials = ee.ServiceAccountCredentials(
             st.secrets["ee_client_email"], 
             st.secrets["ee_private_key"]
         )
         ee.Initialize(credentials, project=st.secrets["ee_project_id"])
-    except Exception:
-        # Local development fallback
-        MY_PROJECT_ID = 'YOUR_PROJECT_ID_HERE' 
-        try:
-            ee.Initialize(project=MY_PROJECT_ID)
-        except:
-            ee.Authenticate()
-            ee.Initialize(project=MY_PROJECT_ID)
-
-initialize_ee()
+    except Exception as e:
+        # 2. If secrets are missing, provide a clear error message
+        st.error("Earth Engine authentication failed. Please ensure 'ee_client_email', 'ee_private_key', and 'ee_project_id' are set in your Streamlit Cloud Secrets.")
+        st.stop()
 
 # =========================================================================
 # 3. CORE LOGIC

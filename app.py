@@ -119,23 +119,27 @@ if st.sidebar.button("Generate Intelligence Maps", type="primary", use_container
 
     # THE LAYOUT FIX: Single HTML block renderer to bypass all Streamlit spacing issues
     def render_map_card(title, map_obj, sensor, height=450):
-        # .get_root().render() extracts raw HTML, avoiding Streamlit's double-iframe trap
-        map_html = map_obj.get_root().render()
+        
+        # THE FIX: _repr_html_() safely sandboxes the map in a secure iframe, 
+        # protecting the Earth Engine scripts from being stripped by the browser.
+        map_html = map_obj._repr_html_()
+        
         url = f"https://sentiwiki.copernicus.eu/web/{sensor.lower()}"
         
         # HTML/CSS packaging for pixel-perfect spacing and dark-theme matching
         custom_html = f"""
+        <!DOCTYPE html>
         <html>
         <head>
             <style>
                 body {{
                     margin: 0; padding: 0;
                     font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    background-color: #0E1117; /* Matches Streamlit's dark mode background */
+                    background-color: #0E1117; 
                     color: rgb(250, 250, 250);
                 }}
                 .card-container {{
-                    display: flex; flex-direction: column; gap: 8px; /* Tightly controls gap between text and map */
+                    display: flex; flex-direction: column; gap: 8px; 
                 }}
                 h4 {{ margin: 0; font-size: 1.1rem; font-weight: 600; padding-top: 5px;}}
                 p {{ margin: 0; color: #9e9e9e; font-style: italic; font-size: 0.85rem; padding-bottom: 5px;}}
@@ -146,7 +150,7 @@ if st.sidebar.button("Generate Intelligence Maps", type="primary", use_container
         <body>
             <div class="card-container">
                 <h4>{title}</h4>
-                <div style="width: 100%; height: {height}px; border-radius: 5px; overflow: hidden; border: 1px solid #333;">
+                <div style="width: 100%; border-radius: 5px; overflow: hidden; border: 1px solid #333;">
                     {map_html}
                 </div>
                 <p>{display_name}. Image captured via Copernicus {sensor}. For further information, see: <a href="{url}" target="_blank">{url}</a></p>

@@ -15,43 +15,15 @@ st.set_page_config(layout="wide", page_title="Geospatial Intelligence Dashboard"
 @st.cache_resource
 def initialize_ee():
     try:
-        # Retrieve secrets
-        client_email = st.secrets["ee_client_email"]
-        project_id = st.secrets["ee_project_id"]
-        raw_key = st.secrets["ee_private_key"]
+        # Streamlit automatically parses the TOML section into a dictionary
+        service_account_info = st.secrets["gcp_service_account"]
         
-        # We try to interpret the raw_key as a JSON-escaped string
-        # which often happens when secrets are stored as strings in configuration
-        try:
-            # If the user stored the full JSON block in the secret, load it
-            if raw_key.strip().startswith('{'):
-                key_dict = json.loads(raw_key)
-                private_key = key_dict['private_key']
-            else:
-                # If it's just the key string, clean the literal \n characters
-                private_key = raw_key.replace('\\n', '\n').strip('"').strip("'")
-        except:
-            private_key = raw_key.replace('\\n', '\n').strip('"').strip("'")
-
-        # Construct the service account dictionary
-        service_account_info = {
-            "type": "service_account",
-            "project_id": project_id,
-            "private_key_id": st.secrets.get("ee_private_key_id", ""),
-            "private_key": private_key,
-            "client_email": client_email,
-            "client_id": st.secrets.get("ee_client_id", ""),
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email.replace('@', '%40')}"
-        }
-        
-        # Use the dictionary-based constructor which handles the byte parsing internally
+        # Pass the dictionary directly to the credentials builder
         credentials = service_account.Credentials.from_service_account_info(service_account_info)
         scoped_credentials = credentials.with_scopes(['https://www.googleapis.com/auth/earthengine'])
         
-        ee.Initialize(credentials=scoped_credentials, project=project_id)
+        # Initialize Earth Engine
+        ee.Initialize(credentials=scoped_credentials, project=service_account_info["project_id"])
         
     except Exception as e:
         st.error(f"Authentication failed: {e}")

@@ -66,35 +66,42 @@ def add_ee_layer(m, ee_image_object, vis_params, name):
     ).add_to(m)
 
 def create_maps(lat, lon, start1, end1, start2, end2, threshold):
-    center_point = ee.Geometry.Point([lon, lat])
-    s2_col = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(center_point).map(mask_s2_clouds)
-    s2_2025 = s2_col.filterDate(start1, end1).median().divide(10000)
-    s2_2026 = s2_col.filterDate(start2, end2).median().divide(10000)
-    urban_expansion = s2_2026.normalizedDifference(['B11', 'B8']).subtract(s2_2025.normalizedDifference(['B11', 'B8'])).gt(threshold).selfMask()
-    sar_2026 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(center_point).filterDate(start2, end2).filter(ee.Filter.eq('instrumentMode', 'IW')).select('VV').median()
+    # ... [Keep the ee logic exactly as it is] ...
 
     maps = []
     for _ in range(4):
-        maps.append(folium.Map(location=[lat, lon], zoom_start=13, tiles='CartoDB dark_matter', height=600))
-    add_ee_layer(maps[0], s2_2025, {'bands': ['B4', 'B3', 'B2'], 'min': 0.0, 'max': 0.3}, 'Date 1 Optical')
-    add_ee_layer(maps[1], s2_2026, {'bands': ['B4', 'B3', 'B2'], 'min': 0.0, 'max': 0.3}, 'Date 2 Optical')
-    add_ee_layer(maps[2], s2_2026, {'bands': ['B4', 'B3', 'B2'], 'min': 0.0, 'max': 0.3}, 'Background')
-    add_ee_layer(maps[2], urban_expansion, {'palette': ['FF0000']}, 'Change Overlay')
-    add_ee_layer(maps[3], sar_2026, {'bands': ['VV'], 'min': -20.0, 'max': 0.0}, 'Date 2 SAR')
+        # Update: Changed height to 450 to fix padding and vertical scrolling
+        maps.append(folium.Map(location=[lat, lon], zoom_start=13, tiles='CartoDB dark_matter', height=450))
+        
+    # ... [Keep the add_ee_layer logic exactly as it is] ...
     return maps
 
 # =========================================================================
 # 3. STREAMLIT UI
 # =========================================================================
+
+# 6. Security Classification (Centered, Red)
+st.markdown("<h3 style='text-align: center; color: red; margin-bottom: 0px;'>UNOFFICIAL</h3>", unsafe_allow_html=True)
+
+# Main Title & 7. Description
 st.title("🛰️ Geospatial Intelligence Dashboard")
+st.markdown("This dashboard leverages the European Space Agency's Copernicus Programme, specifically the Sentinel-1 and Sentinel-2 missions, to provide a comparison imagery of selected locations across the globe.")
+
 location_query = st.sidebar.text_input("Enter a city, base, or island name:")
 
+# Set default location values
 default_lat, default_lon = -35.2809, 149.1300
+display_name = "Canberra, Australia" # Default text if no query is made
+
 if location_query:
     lat_res, lon_res = get_coordinates_opencage(location_query)
     if lat_res:
         default_lat, default_lon = lat_res, lon_res
-        st.sidebar.success(f"Found: {location_query}")
+        display_name = location_query.title() # Formats the search query nicely
+        st.sidebar.success(f"Found: {display_name}")
+
+# 3. Dynamic Location Display
+st.subheader(f"📍 Location: {display_name}")
 
 lat_val = st.sidebar.number_input("Latitude", value=float(default_lat), format="%.6f")
 lon_val = st.sidebar.number_input("Longitude", value=float(default_lon), format="%.6f")
@@ -105,11 +112,42 @@ d2_val = st.sidebar.date_input("Date 2 (Comparison)", value=date(2026, 6, 1))
 if st.sidebar.button("Generate Intelligence Maps", type="primary", use_container_width=True):
     start1, end1 = (d1_val - timedelta(30)).strftime('%Y-%m-%d'), (d1_val + timedelta(30)).strftime('%Y-%m-%d')
     start2, end2 = (d2_val - timedelta(30)).strftime('%Y-%m-%d'), (d2_val + timedelta(30)).strftime('%Y-%m-%d')
-    maps = create_maps(lat_val, lon_val, start1, end1, start2, end2, threshold_val)
-    c1, c2 = st.columns(2)
-    with c1:
-        components.html(maps[0]._repr_html_(), height=610)
-        components.html(maps[2]._repr_html_(), height=610)
-    with c2:
-        components.html(maps[1]._repr_html_(), height=610)
-        components.html(maps[3]._repr_html_(), height=610)
+    
+    with st.spinner("Generating imagery via Google Earth Engine..."):
+        maps = create_maps(lat_val, lon_val, start1, end1, start2, end2, threshold_val)
+    
+    # 5. Helper function for the grey italic captions
+    def get_caption(sensor):
+        url = f"https://sentiwiki.copernicus.eu/web/{sensor.lower()}"
+        return f"<p style='color: grey; font-style: italic; font-size: 0.9em; margin-top: 5px;'>{display_name}. Image captured via Copernicus {sensor}. For further information, see: <a href='{url}' target='_blank'>{url}</a></p>"
+
+    st.write("---") # Adds a subtle divider line before the maps
+
+    # ROW 1 (Maps 1 & 2)
+    r1_col1, r1_col2 = st.columns(2)
+    
+    with r1_col1:
+        st.markdown("**Image 1: Baseline via Sentinel-2**")
+        # 4. scrolling=False removes the window scrollbars
+        components.html(maps[0]._repr_html_(), height=450, scrolling=False) 
+        st.markdown(get_caption("Sentinel-2"), unsafe_allow_html=True)
+        
+    with r1_col2:
+        st.markdown("**Image 2: Comparison via Sentinel-2**")
+        components.html(maps[1]._repr_html_(), height=450, scrolling=False)
+        st.markdown(get_caption("Sentinel-2"), unsafe_allow_html=True)
+
+    st.write("") # Adds a tiny bit of vertical padding between rows
+
+    # ROW 2 (Maps 3 & 4)
+    r2_col1, r2_col2 = st.columns(2)
+    
+    with r2_col1:
+        st.markdown("**Image 3: Differences**")
+        components.html(maps[2]._repr_html_(), height=450, scrolling=False)
+        st.markdown(get_caption("Sentinel-2"), unsafe_allow_html=True)
+        
+    with r2_col2:
+        st.markdown("**Image 4: SAR via Sentinel-1**")
+        components.html(maps[3]._repr_html_(), height=450, scrolling=False)
+        st.markdown(get_caption("Sentinel-1"), unsafe_allow_html=True)

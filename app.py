@@ -112,8 +112,28 @@ if st.sidebar.button("Generate Intelligence Maps", type="primary", use_container
     start1, end1 = (d1_val - timedelta(90)).strftime('%Y-%m-%d'), (d1_val + timedelta(90)).strftime('%Y-%m-%d')
     start2, end2 = (d2_val - timedelta(90)).strftime('%Y-%m-%d'), (d2_val + timedelta(90)).strftime('%Y-%m-%d')
     
-    with st.spinner("Generating imagery via Google Earth Engine..."):
+    with st.spinner("Generating imagery..."):
         maps = create_maps(lat_val, lon_val, start1, end1, start2, end2, threshold_val)
+    
+    st.write("---") 
+
+    # We define a helper to render a 'tight' card
+    def show_map(title, map_obj, sensor):
+        st.markdown(f"**{title}**")
+        # Direct rendering without custom HTML wrappers prevents script blocking
+        components.html(map_obj._repr_html_(), height=450, scrolling=False)
+        url = f"https://sentiwiki.copernicus.eu/web/{sensor.lower()}"
+        # Tight padding via CSS
+        st.markdown(f"<p style='color: grey; font-style: italic; font-size: 0.8em; margin-top: -15px; margin-bottom: 20px;'>{display_name}. Image via {sensor}. <a href='{url}'>Info</a></p>", unsafe_allow_html=True)
+
+    # 2x2 Grid
+    col1, col2 = st.columns(2)
+    with col1:
+        show_map("Image 1: Baseline via Sentinel-2", maps[0], "Sentinel-2")
+        show_map("Image 3: Differences", maps[2], "Sentinel-2")
+    with col2:
+        show_map("Image 2: Comparison via Sentinel-2", maps[1], "Sentinel-2")
+        show_map("Image 4: SAR via Sentinel-1", maps[3], "Sentinel-1")
     
     st.write("---") 
 

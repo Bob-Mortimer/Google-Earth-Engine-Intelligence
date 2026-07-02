@@ -89,15 +89,14 @@ st.markdown("This dashboard leverages the European Space Agency's Copernicus Pro
 
 location_query = st.sidebar.text_input("Enter a city, base, or island name:")
 
-# Set default location values
 default_lat, default_lon = -35.2809, 149.1300
-display_name = "Canberra, Australia" # Default text if no query is made
+display_name = "Canberra, Australia" 
 
 if location_query:
     lat_res, lon_res = get_coordinates_opencage(location_query)
     if lat_res:
         default_lat, default_lon = lat_res, lon_res
-        display_name = location_query.title() # Formats the search query nicely
+        display_name = location_query.title()
         st.sidebar.success(f"Found: {display_name}")
 
 # 3. Dynamic Location Display
@@ -110,44 +109,65 @@ d1_val = st.sidebar.date_input("Date 1 (Baseline)", value=date(2025, 6, 1))
 d2_val = st.sidebar.date_input("Date 2 (Comparison)", value=date(2026, 6, 1))
 
 if st.sidebar.button("Generate Intelligence Maps", type="primary", use_container_width=True):
-    start1, end1 = (d1_val - timedelta(30)).strftime('%Y-%m-%d'), (d1_val + timedelta(30)).strftime('%Y-%m-%d')
-    start2, end2 = (d2_val - timedelta(30)).strftime('%Y-%m-%d'), (d2_val + timedelta(30)).strftime('%Y-%m-%d')
+    start1, end1 = (d1_val - timedelta(90)).strftime('%Y-%m-%d'), (d1_val + timedelta(90)).strftime('%Y-%m-%d')
+    start2, end2 = (d2_val - timedelta(90)).strftime('%Y-%m-%d'), (d2_val + timedelta(90)).strftime('%Y-%m-%d')
     
     with st.spinner("Generating imagery via Google Earth Engine..."):
         maps = create_maps(lat_val, lon_val, start1, end1, start2, end2, threshold_val)
     
-    # 5. Helper function for the grey italic captions
-    def get_caption(sensor):
+    st.write("---") 
+
+    # THE LAYOUT FIX: Single HTML block renderer to bypass all Streamlit spacing issues
+    def render_map_card(title, map_obj, sensor, height=450):
+        # .get_root().render() extracts raw HTML, avoiding Streamlit's double-iframe trap
+        map_html = map_obj.get_root().render()
         url = f"https://sentiwiki.copernicus.eu/web/{sensor.lower()}"
-        return f"<p style='color: grey; font-style: italic; font-size: 0.9em; margin-top: 5px;'>{display_name}. Image captured via Copernicus {sensor}. For further information, see: <a href='{url}' target='_blank'>{url}</a></p>"
+        
+        # HTML/CSS packaging for pixel-perfect spacing and dark-theme matching
+        custom_html = f"""
+        <html>
+        <head>
+            <style>
+                body {{
+                    margin: 0; padding: 0;
+                    font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background-color: #0E1117; /* Matches Streamlit's dark mode background */
+                    color: rgb(250, 250, 250);
+                }}
+                .card-container {{
+                    display: flex; flex-direction: column; gap: 8px; /* Tightly controls gap between text and map */
+                }}
+                h4 {{ margin: 0; font-size: 1.1rem; font-weight: 600; padding-top: 5px;}}
+                p {{ margin: 0; color: #9e9e9e; font-style: italic; font-size: 0.85rem; padding-bottom: 5px;}}
+                a {{ color: #4da6ff; text-decoration: none; }}
+                a:hover {{ text-decoration: underline; }}
+            </style>
+        </head>
+        <body>
+            <div class="card-container">
+                <h4>{title}</h4>
+                <div style="width: 100%; height: {height}px; border-radius: 5px; overflow: hidden; border: 1px solid #333;">
+                    {map_html}
+                </div>
+                <p>{display_name}. Image captured via Copernicus {sensor}. For further information, see: <a href="{url}" target="_blank">{url}</a></p>
+            </div>
+        </body>
+        </html>
+        """
+        # Height is map height + text buffer. scrolling=False kills the scroll wheels.
+        components.html(custom_html, height=height + 80, scrolling=False)
 
-    st.write("---") # Adds a subtle divider line before the maps
-
-    # ROW 1 (Maps 1 & 2)
+    # ---------------------------------------------------------
+    # RENDER THE UI
+    # ---------------------------------------------------------
     r1_col1, r1_col2 = st.columns(2)
-    
     with r1_col1:
-        st.markdown("**Image 1: Baseline via Sentinel-2**")
-        # 4. scrolling=False removes the window scrollbars
-        components.html(maps[0]._repr_html_(), height=450, scrolling=False) 
-        st.markdown(get_caption("Sentinel-2"), unsafe_allow_html=True)
-        
+        render_map_card("Image 1: Baseline via Sentinel-2", maps[0], "Sentinel-2")
     with r1_col2:
-        st.markdown("**Image 2: Comparison via Sentinel-2**")
-        components.html(maps[1]._repr_html_(), height=450, scrolling=False)
-        st.markdown(get_caption("Sentinel-2"), unsafe_allow_html=True)
+        render_map_card("Image 2: Comparison via Sentinel-2", maps[1], "Sentinel-2")
 
-    st.write("") # Adds a tiny bit of vertical padding between rows
-
-    # ROW 2 (Maps 3 & 4)
     r2_col1, r2_col2 = st.columns(2)
-    
     with r2_col1:
-        st.markdown("**Image 3: Differences**")
-        components.html(maps[2]._repr_html_(), height=450, scrolling=False)
-        st.markdown(get_caption("Sentinel-2"), unsafe_allow_html=True)
-        
+        render_map_card("Image 3: Differences", maps[2], "Sentinel-2")
     with r2_col2:
-        st.markdown("**Image 4: SAR via Sentinel-1**")
-        components.html(maps[3]._repr_html_(), height=450, scrolling=False)
-        st.markdown(get_caption("Sentinel-1"), unsafe_allow_html=True)
+        render_map_card("Image 4: SAR via Sentinel-1", maps[3], "Sentinel-1")
